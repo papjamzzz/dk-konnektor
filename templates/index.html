@@ -1,0 +1,1381 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>dk konnektor — golf edge detector</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800;900&display=swap" rel="stylesheet">
+  <script src="https://cdn.tailwindcss.com"></script>
+  <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.0/dist/chart.umd.min.js"></script>
+  <style>
+    :root {
+      --bg:      #08090e;
+      --surface: #0f1117;
+      --card:    #13161f;
+      --border:  #1e2230;
+      --muted:   #2d3347;
+      --text:    #ffffff;
+      --dim:     #6b7280;
+      --green:   #00d595;
+      --blue:    #3861fb;
+      --amber:   #f5a623;
+      --red:     #f6465d;
+      --purple:  #a78bfa;
+      --cyan:    #22d3ee;
+      --orange:  #fb923c;
+      --dk-green:#1a9c53;
+    }
+
+    * { box-sizing: border-box; margin: 0; padding: 0; }
+
+    body {
+      background: var(--bg);
+      color: var(--text);
+      font-family: 'Inter', -apple-system, sans-serif;
+      min-height: 100vh;
+      overflow-x: hidden;
+    }
+
+    ::-webkit-scrollbar { width: 6px; height: 6px; }
+    ::-webkit-scrollbar-track { background: var(--surface); }
+    ::-webkit-scrollbar-thumb { background: var(--muted); border-radius: 3px; }
+
+    /* ── Header ── */
+    .header {
+      background: linear-gradient(180deg, #0c0e17 0%, #08090e 100%);
+      border-bottom: 1px solid rgba(0,213,149,0.12);
+      padding: 11px 24px;
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      position: sticky;
+      top: 0;
+      z-index: 100;
+      backdrop-filter: blur(20px);
+      box-shadow: 0 1px 0 rgba(0,213,149,0.08), 0 4px 24px rgba(0,0,0,0.6);
+    }
+
+    .header::before {
+      content: '';
+      position: absolute;
+      top: 0; left: 0; right: 0;
+      height: 1px;
+      background: linear-gradient(90deg, transparent 0%, rgba(0,213,149,0.5) 30%, rgba(56,97,251,0.4) 60%, transparent 100%);
+    }
+
+    .brand {
+      display: flex;
+      align-items: center;
+      gap: 10px;
+    }
+
+    .brand-name {
+      font-size: 17px;
+      font-weight: 800;
+      letter-spacing: -0.02em;
+      text-transform: lowercase;
+      line-height: 1;
+    }
+
+    .brand-name .b1 { color: #fff; }
+    .brand-name .b2 {
+      background: linear-gradient(90deg, #00d595 0%, #22d3ee 100%);
+      -webkit-background-clip: text;
+      -webkit-text-fill-color: transparent;
+      background-clip: text;
+    }
+
+    .brand-sub {
+      font-size: 10px;
+      font-weight: 600;
+      letter-spacing: 1.5px;
+      text-transform: uppercase;
+      color: var(--dim);
+    }
+
+    img.logo {
+      height: 30px;
+      width: auto;
+    }
+
+    .header-right {
+      display: flex;
+      align-items: center;
+      gap: 12px;
+    }
+
+    .tournament-badge {
+      background: rgba(0,213,149,0.08);
+      border: 1px solid rgba(0,213,149,0.2);
+      border-radius: 8px;
+      padding: 5px 12px;
+      font-size: 12px;
+      font-weight: 600;
+      color: var(--green);
+      white-space: nowrap;
+    }
+
+    .wind-badge {
+      background: rgba(56,97,251,0.1);
+      border: 1px solid rgba(56,97,251,0.2);
+      border-radius: 8px;
+      padding: 5px 12px;
+      font-size: 12px;
+      font-weight: 600;
+      color: #7ba4fb;
+      white-space: nowrap;
+    }
+
+    .refresh-btn {
+      background: rgba(0,213,149,0.08);
+      border: 1px solid rgba(0,213,149,0.2);
+      border-radius: 8px;
+      color: var(--green);
+      font-size: 12px;
+      font-weight: 700;
+      padding: 6px 14px;
+      cursor: pointer;
+      transition: all 0.15s;
+      letter-spacing: 0.5px;
+    }
+
+    .refresh-btn:hover { background: rgba(0,213,149,0.15); }
+    .refresh-btn.spinning { animation: spin 1s linear infinite; }
+
+    @keyframes spin { to { transform: rotate(360deg); } }
+
+    .cache-age {
+      font-size: 11px;
+      color: var(--dim);
+    }
+
+    /* ── Stat grid ── */
+    .stat-grid {
+      display: grid;
+      grid-template-columns: repeat(6, 1fr);
+      gap: 12px;
+      padding: 16px 24px;
+    }
+
+    .stat-card {
+      background: var(--card);
+      border: 1px solid var(--border);
+      border-radius: 12px;
+      padding: 14px 18px;
+      transition: border-color 0.2s, transform 0.15s;
+    }
+
+    .stat-card:hover { border-color: rgba(0,213,149,0.3); transform: translateY(-1px); }
+
+    .stat-label {
+      font-size: 9px;
+      font-weight: 700;
+      letter-spacing: 1px;
+      text-transform: uppercase;
+      color: var(--dim);
+      margin-bottom: 4px;
+    }
+
+    .stat-value {
+      font-size: 26px;
+      font-weight: 800;
+      line-height: 1;
+      font-variant-numeric: tabular-nums;
+      letter-spacing: -0.5px;
+    }
+
+    .stat-sub { font-size: 10px; color: var(--dim); margin-top: 3px; }
+
+    /* ── Tier bar ── */
+    .tier-bar {
+      display: flex;
+      padding: 0 24px 14px;
+      gap: 8px;
+    }
+
+    .tier-seg {
+      flex: 1;
+      background: var(--card);
+      border: 1px solid var(--border);
+      border-radius: 8px;
+      padding: 8px 12px;
+      text-align: center;
+      transition: border-color 0.15s;
+    }
+
+    .tier-seg:hover { border-color: var(--muted); }
+
+    .tier-seg-label {
+      font-size: 9px;
+      font-weight: 700;
+      letter-spacing: 1px;
+      text-transform: uppercase;
+      margin-bottom: 2px;
+    }
+
+    .tier-seg-count {
+      font-size: 20px;
+      font-weight: 800;
+      font-variant-numeric: tabular-nums;
+    }
+
+    /* tier colors */
+    .t-elite  { color: #00d595; }
+    .t-strong { color: #22d3ee; }
+    .t-lean   { color: #f5a623; }
+    .t-weak   { color: #fb923c; }
+    .t-fade   { color: #f6465d; }
+
+    /* ── Filter bar ── */
+    .filter-bar {
+      padding: 10px 24px;
+      background: var(--surface);
+      border-bottom: 1px solid var(--border);
+      border-top: 1px solid var(--border);
+      display: flex;
+      align-items: center;
+      gap: 10px;
+      flex-wrap: wrap;
+    }
+
+    .tier-pill {
+      padding: 4px 12px;
+      border-radius: 20px;
+      font-size: 11px;
+      font-weight: 700;
+      cursor: pointer;
+      border: 1px solid var(--border);
+      background: transparent;
+      color: var(--dim);
+      transition: all 0.15s;
+      letter-spacing: 0.3px;
+      white-space: nowrap;
+    }
+
+    .tier-pill:hover { color: var(--text); }
+    .tier-pill.active { color: #000; }
+    .tier-pill[data-tier="ALL"].active        { background: var(--green); border-color: var(--green); color: #000; }
+    .tier-pill[data-tier="ELITE"].active      { background: #00d595; border-color: #00d595; }
+    .tier-pill[data-tier="STRONG"].active     { background: #22d3ee; border-color: #22d3ee; }
+    .tier-pill[data-tier="LEAN"].active       { background: var(--amber); border-color: var(--amber); }
+    .tier-pill[data-tier="WEAK"].active       { background: var(--orange); border-color: var(--orange); }
+    .tier-pill[data-tier="FADE"].active       { background: var(--red); border-color: var(--red); }
+
+    .filter-search {
+      background: var(--card);
+      border: 1px solid var(--border);
+      border-radius: 8px;
+      padding: 5px 12px;
+      color: var(--text);
+      font-size: 13px;
+      outline: none;
+      width: 160px;
+      transition: border-color 0.15s;
+    }
+
+    .filter-search:focus { border-color: var(--green); }
+    .filter-search::placeholder { color: var(--dim); }
+
+    .filter-sep { width: 1px; height: 22px; background: var(--border); margin: 0 2px; }
+
+    .sort-btn {
+      background: transparent;
+      border: 1px solid var(--border);
+      border-radius: 6px;
+      color: var(--dim);
+      font-size: 11px;
+      font-weight: 600;
+      padding: 4px 10px;
+      cursor: pointer;
+      transition: all 0.15s;
+      letter-spacing: 0.3px;
+    }
+
+    .sort-btn:hover { color: var(--text); border-color: var(--muted); }
+    .sort-btn.active { color: var(--green); border-color: var(--green); }
+
+    .export-btn {
+      margin-left: auto;
+      background: rgba(56,97,251,0.1);
+      border: 1px solid rgba(56,97,251,0.25);
+      border-radius: 8px;
+      color: #7ba4fb;
+      font-size: 11px;
+      font-weight: 700;
+      padding: 5px 12px;
+      cursor: pointer;
+      transition: all 0.15s;
+      letter-spacing: 0.3px;
+    }
+
+    .export-btn:hover { background: rgba(56,97,251,0.18); }
+
+    .lineup-btn {
+      background: rgba(0,213,149,0.08);
+      border: 1px solid rgba(0,213,149,0.2);
+      border-radius: 8px;
+      color: var(--green);
+      font-size: 11px;
+      font-weight: 700;
+      padding: 5px 12px;
+      cursor: pointer;
+      transition: all 0.15s;
+      letter-spacing: 0.3px;
+    }
+
+    .lineup-btn:hover { background: rgba(0,213,149,0.15); }
+
+    /* ── Table ── */
+    .table-wrap {
+      padding: 0 24px 16px;
+      overflow-x: auto;
+    }
+
+    table {
+      width: 100%;
+      border-collapse: collapse;
+      font-size: 13px;
+    }
+
+    thead th {
+      padding: 10px 12px;
+      text-align: left;
+      font-size: 10px;
+      font-weight: 700;
+      letter-spacing: 0.8px;
+      text-transform: uppercase;
+      color: var(--dim);
+      border-bottom: 1px solid var(--border);
+      cursor: pointer;
+      user-select: none;
+      white-space: nowrap;
+    }
+
+    thead th:hover { color: var(--text); }
+    thead th.sort-asc::after  { content: ' ↑'; color: var(--green); }
+    thead th.sort-desc::after { content: ' ↓'; color: var(--green); }
+
+    tbody tr {
+      border-bottom: 1px solid rgba(30,34,48,0.6);
+      cursor: pointer;
+      transition: background 0.1s;
+    }
+
+    tbody tr:hover { background: var(--card); }
+    tbody tr.selected { background: rgba(0,213,149,0.06); }
+
+    tbody td { padding: 10px 12px; vertical-align: middle; }
+
+    .rank-num {
+      font-size: 12px;
+      font-weight: 700;
+      color: var(--dim);
+      font-variant-numeric: tabular-nums;
+      min-width: 24px;
+    }
+
+    .player-name {
+      font-weight: 700;
+      font-size: 14px;
+      color: var(--text);
+    }
+
+    .score-badge {
+      display: inline-flex;
+      align-items: center;
+      gap: 7px;
+      font-weight: 800;
+      font-variant-numeric: tabular-nums;
+      font-size: 15px;
+    }
+
+    .score-bar-wrap {
+      width: 48px;
+      height: 4px;
+      background: var(--border);
+      border-radius: 2px;
+      overflow: hidden;
+    }
+
+    .score-bar-fill { height: 100%; border-radius: 2px; }
+
+    .tier-badge {
+      font-size: 9px;
+      font-weight: 700;
+      letter-spacing: 0.5px;
+      text-transform: uppercase;
+      padding: 2px 7px;
+      border-radius: 4px;
+    }
+
+    .tb-elite  { background: rgba(0,213,149,0.15);  color: #00d595; }
+    .tb-strong { background: rgba(34,211,238,0.15); color: #22d3ee; }
+    .tb-lean   { background: rgba(245,166,35,0.15); color: var(--amber); }
+    .tb-weak   { background: rgba(251,146,60,0.12); color: var(--orange); }
+    .tb-fade   { background: rgba(246,70,93,0.12);  color: var(--red); }
+
+    .salary-cell {
+      font-variant-numeric: tabular-nums;
+      font-weight: 600;
+      font-size: 13px;
+    }
+
+    .signal-mini {
+      display: flex;
+      gap: 3px;
+      align-items: center;
+    }
+
+    .sig-pip {
+      width: 28px;
+      height: 3px;
+      border-radius: 1.5px;
+      background: var(--border);
+      overflow: hidden;
+    }
+
+    .sig-pip-fill { height: 100%; border-radius: 1.5px; }
+
+    .kelly-badge {
+      font-size: 10px;
+      font-weight: 700;
+      padding: 2px 7px;
+      border-radius: 4px;
+      white-space: nowrap;
+    }
+
+    .kb-pass   { background: rgba(107,114,128,0.15); color: var(--dim); }
+    .kb-weak   { background: rgba(251,146,60,0.12);  color: var(--orange); }
+    .kb-lean   { background: rgba(245,166,35,0.15);  color: var(--amber); }
+    .kb-strong { background: rgba(34,211,238,0.15);  color: var(--cyan); }
+    .kb-elite  { background: rgba(0,213,149,0.15);   color: var(--green); }
+
+    .own-pct {
+      font-variant-numeric: tabular-nums;
+      font-size: 12px;
+      color: var(--dim);
+    }
+
+    .star-btn {
+      background: none;
+      border: none;
+      cursor: pointer;
+      color: var(--muted);
+      font-size: 15px;
+      padding: 2px 4px;
+      transition: color 0.15s;
+    }
+
+    .star-btn.starred { color: var(--amber); }
+
+    /* ── Loader ── */
+    .loader {
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      gap: 8px;
+      padding: 60px;
+      color: var(--dim);
+      font-size: 14px;
+    }
+
+    .spinner {
+      width: 20px;
+      height: 20px;
+      border: 2px solid var(--border);
+      border-top-color: var(--green);
+      border-radius: 50%;
+      animation: spin 0.8s linear infinite;
+    }
+
+    /* ── Detail panel ── */
+    #detail-panel {
+      position: fixed;
+      right: -440px;
+      top: 0;
+      width: 420px;
+      height: 100vh;
+      background: var(--surface);
+      border-left: 1px solid var(--border);
+      z-index: 200;
+      overflow-y: auto;
+      transition: right 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+    }
+
+    #detail-panel.open { right: 0; }
+
+    .panel-header {
+      padding: 20px;
+      border-bottom: 1px solid var(--border);
+      position: sticky;
+      top: 0;
+      background: var(--surface);
+      z-index: 1;
+    }
+
+    .panel-close {
+      background: none;
+      border: none;
+      color: var(--dim);
+      font-size: 18px;
+      cursor: pointer;
+      float: right;
+      margin-top: -2px;
+      transition: color 0.15s;
+    }
+
+    .panel-close:hover { color: var(--text); }
+
+    .panel-body { padding: 20px; }
+
+    .signal-row { margin-bottom: 16px; }
+
+    .signal-label {
+      display: flex;
+      justify-content: space-between;
+      font-size: 11px;
+      color: var(--dim);
+      margin-bottom: 5px;
+      font-weight: 600;
+      letter-spacing: 0.3px;
+    }
+
+    .signal-label span:last-child { color: var(--text); font-weight: 700; }
+
+    .signal-track {
+      height: 6px;
+      background: var(--border);
+      border-radius: 3px;
+      overflow: hidden;
+    }
+
+    .signal-fill { height: 100%; border-radius: 3px; transition: width 0.6s ease; }
+
+    .detail-stat-grid {
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      gap: 10px;
+      margin-bottom: 20px;
+    }
+
+    .detail-stat {
+      background: var(--card);
+      border: 1px solid var(--border);
+      border-radius: 8px;
+      padding: 10px 14px;
+    }
+
+    .detail-stat-label {
+      font-size: 9px;
+      font-weight: 700;
+      letter-spacing: 0.8px;
+      text-transform: uppercase;
+      color: var(--dim);
+      margin-bottom: 3px;
+    }
+
+    .detail-stat-val {
+      font-size: 18px;
+      font-weight: 800;
+      font-variant-numeric: tabular-nums;
+    }
+
+    .section-title {
+      font-size: 10px;
+      font-weight: 700;
+      letter-spacing: 1px;
+      text-transform: uppercase;
+      color: var(--dim);
+      margin-bottom: 12px;
+      padding-bottom: 6px;
+      border-bottom: 1px solid var(--border);
+    }
+
+    /* ── Lineup modal ── */
+    #lineup-modal {
+      position: fixed;
+      inset: 0;
+      background: rgba(0,0,0,0.8);
+      z-index: 300;
+      display: none;
+      align-items: center;
+      justify-content: center;
+    }
+
+    #lineup-modal.open { display: flex; }
+
+    .modal-box {
+      background: var(--surface);
+      border: 1px solid var(--border);
+      border-radius: 16px;
+      width: min(700px, 95vw);
+      max-height: 80vh;
+      overflow-y: auto;
+    }
+
+    .modal-header {
+      padding: 20px 24px 16px;
+      border-bottom: 1px solid var(--border);
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      position: sticky;
+      top: 0;
+      background: var(--surface);
+    }
+
+    .modal-title {
+      font-size: 16px;
+      font-weight: 800;
+      letter-spacing: -0.3px;
+    }
+
+    .modal-close {
+      background: none;
+      border: none;
+      color: var(--dim);
+      font-size: 20px;
+      cursor: pointer;
+      transition: color 0.15s;
+    }
+
+    .modal-close:hover { color: var(--text); }
+
+    .modal-body { padding: 20px 24px; }
+
+    .lineup-card {
+      background: var(--card);
+      border: 1px solid var(--border);
+      border-radius: 10px;
+      padding: 14px 16px;
+      margin-bottom: 10px;
+      transition: border-color 0.15s;
+    }
+
+    .lineup-card:hover { border-color: rgba(0,213,149,0.3); }
+
+    .lineup-card-header {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      margin-bottom: 10px;
+    }
+
+    .lineup-num {
+      font-size: 11px;
+      font-weight: 700;
+      color: var(--dim);
+      letter-spacing: 0.5px;
+    }
+
+    .lineup-meta {
+      display: flex;
+      gap: 12px;
+      font-size: 11px;
+      color: var(--dim);
+    }
+
+    .lineup-meta span b { color: var(--text); font-weight: 700; }
+
+    .lineup-players {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 6px;
+    }
+
+    .lineup-player-chip {
+      background: rgba(0,213,149,0.07);
+      border: 1px solid rgba(0,213,149,0.15);
+      border-radius: 6px;
+      padding: 3px 9px;
+      font-size: 12px;
+      font-weight: 600;
+      color: var(--text);
+      white-space: nowrap;
+    }
+
+    .lineup-player-chip small {
+      color: var(--dim);
+      font-size: 10px;
+      margin-left: 4px;
+    }
+
+    .lineup-controls {
+      padding: 0 24px 20px;
+      display: flex;
+      gap: 10px;
+      align-items: center;
+    }
+
+    .ctrl-label { font-size: 12px; color: var(--dim); }
+
+    .ctrl-input {
+      background: var(--card);
+      border: 1px solid var(--border);
+      border-radius: 6px;
+      color: var(--text);
+      font-size: 13px;
+      padding: 5px 10px;
+      outline: none;
+      width: 70px;
+      transition: border-color 0.15s;
+    }
+
+    .ctrl-input:focus { border-color: var(--green); }
+
+    .gen-btn {
+      background: var(--green);
+      border: none;
+      border-radius: 8px;
+      color: #000;
+      font-size: 13px;
+      font-weight: 800;
+      padding: 7px 18px;
+      cursor: pointer;
+      transition: opacity 0.15s;
+    }
+
+    .gen-btn:hover { opacity: 0.85; }
+
+    .dl-btn {
+      background: rgba(56,97,251,0.1);
+      border: 1px solid rgba(56,97,251,0.25);
+      border-radius: 8px;
+      color: #7ba4fb;
+      font-size: 13px;
+      font-weight: 700;
+      padding: 7px 16px;
+      cursor: pointer;
+      transition: all 0.15s;
+      text-decoration: none;
+    }
+
+    .dl-btn:hover { background: rgba(56,97,251,0.18); }
+
+    /* ── Empty state ── */
+    .empty {
+      padding: 60px;
+      text-align: center;
+      color: var(--dim);
+    }
+
+    .empty h3 { font-size: 18px; font-weight: 700; color: var(--text); margin-bottom: 8px; }
+    .empty p  { font-size: 14px; }
+
+    /* ── Responsive ── */
+    @media (max-width: 900px) {
+      .stat-grid { grid-template-columns: repeat(3, 1fr); }
+      #detail-panel { width: 100vw; right: -100vw; }
+    }
+
+    @media (max-width: 600px) {
+      .stat-grid { grid-template-columns: repeat(2, 1fr); }
+      .header { padding: 10px 14px; }
+      .table-wrap, .filter-bar, .tier-bar, .stat-grid { padding-left: 14px; padding-right: 14px; }
+    }
+  </style>
+</head>
+<body>
+
+<!-- ── Header ── -->
+<header class="header">
+  <div class="brand">
+    <img src="/static/logo.png" alt="" class="logo" onerror="this.style.display='none'">
+    <div>
+      <div class="brand-name"><span class="b1">dk</span> <span class="b2">konnektor</span></div>
+      <div class="brand-sub">Golf DFS Edge Detector</div>
+    </div>
+  </div>
+  <div class="header-right">
+    <div class="tournament-badge" id="tournament-name">Loading...</div>
+    <div class="wind-badge" id="wind-display">Wind: — mph</div>
+    <span class="cache-age" id="cache-age"></span>
+    <button class="refresh-btn" id="refresh-btn" onclick="fetchPlayers(true)">⟳ Refresh</button>
+  </div>
+</header>
+
+<!-- ── Stat grid ── -->
+<div class="stat-grid" id="stat-grid">
+  <div class="stat-card">
+    <div class="stat-label">Players</div>
+    <div class="stat-value" id="s-total">—</div>
+    <div class="stat-sub">in field</div>
+  </div>
+  <div class="stat-card">
+    <div class="stat-label">Top Edge</div>
+    <div class="stat-value" id="s-top" style="color: var(--green)">—</div>
+    <div class="stat-sub">score</div>
+  </div>
+  <div class="stat-card">
+    <div class="stat-label">Avg Edge</div>
+    <div class="stat-value" id="s-avg">—</div>
+    <div class="stat-sub">field avg</div>
+  </div>
+  <div class="stat-card">
+    <div class="stat-label">Elite Plays</div>
+    <div class="stat-value" id="s-elite" style="color: var(--green)">—</div>
+    <div class="stat-sub">edge ≥ 80</div>
+  </div>
+  <div class="stat-card">
+    <div class="stat-label">Course</div>
+    <div class="stat-value" id="s-course" style="font-size: 16px; padding-top: 4px">—</div>
+    <div class="stat-sub">profile</div>
+  </div>
+  <div class="stat-card">
+    <div class="stat-label">Watched</div>
+    <div class="stat-value" id="s-watched">0</div>
+    <div class="stat-sub">starred</div>
+  </div>
+</div>
+
+<!-- ── Tier bar ── -->
+<div class="tier-bar" id="tier-bar">
+  <div class="tier-seg" onclick="filterTier('ELITE')">
+    <div class="tier-seg-label t-elite">Elite</div>
+    <div class="tier-seg-count t-elite" id="tc-elite">0</div>
+  </div>
+  <div class="tier-seg" onclick="filterTier('STRONG')">
+    <div class="tier-seg-label t-strong">Strong</div>
+    <div class="tier-seg-count t-strong" id="tc-strong">0</div>
+  </div>
+  <div class="tier-seg" onclick="filterTier('LEAN')">
+    <div class="tier-seg-label t-lean">Lean</div>
+    <div class="tier-seg-count t-lean" id="tc-lean">0</div>
+  </div>
+  <div class="tier-seg" onclick="filterTier('WEAK')">
+    <div class="tier-seg-label t-weak">Weak</div>
+    <div class="tier-seg-count t-weak" id="tc-weak">0</div>
+  </div>
+  <div class="tier-seg" onclick="filterTier('FADE')">
+    <div class="tier-seg-label t-fade">Fade</div>
+    <div class="tier-seg-count t-fade" id="tc-fade">0</div>
+  </div>
+</div>
+
+<!-- ── Filter bar ── -->
+<div class="filter-bar">
+  <button class="tier-pill active" data-tier="ALL" onclick="setTierFilter('ALL', this)">All</button>
+  <button class="tier-pill" data-tier="ELITE" onclick="setTierFilter('ELITE', this)">Elite</button>
+  <button class="tier-pill" data-tier="STRONG" onclick="setTierFilter('STRONG', this)">Strong</button>
+  <button class="tier-pill" data-tier="LEAN" onclick="setTierFilter('LEAN', this)">Lean</button>
+  <button class="tier-pill" data-tier="WEAK" onclick="setTierFilter('WEAK', this)">Weak</button>
+  <button class="tier-pill" data-tier="FADE" onclick="setTierFilter('FADE', this)">Fade</button>
+
+  <div class="filter-sep"></div>
+
+  <input class="filter-search" type="text" placeholder="Search player..." id="search-input" oninput="applyFilters()">
+
+  <div class="filter-sep"></div>
+
+  <button class="sort-btn active" data-sort="edge_score" onclick="setSort('edge_score', this)">Edge Score</button>
+  <button class="sort-btn" data-sort="salary" onclick="setSort('salary', this)">Salary</button>
+  <button class="sort-btn" data-sort="sig_divergence" onclick="setSort('sig_divergence', this)">Divergence</button>
+  <button class="sort-btn" data-sort="sig_value" onclick="setSort('sig_value', this)">Value</button>
+  <button class="sort-btn" data-sort="sig_course_fit" onclick="setSort('sig_course_fit', this)">Course Fit</button>
+  <button class="sort-btn" data-sort="projected_ownership" onclick="setSort('projected_ownership', this)">Ownership</button>
+
+  <button class="lineup-btn" onclick="openLineupModal()">⚡ Build Lineups</button>
+  <button class="export-btn" onclick="exportCSV()">↓ Export CSV</button>
+</div>
+
+<!-- ── Table ── -->
+<div class="table-wrap">
+  <div class="loader" id="loader">
+    <div class="spinner"></div>
+    Fetching player data...
+  </div>
+  <table id="player-table" style="display:none">
+    <thead>
+      <tr>
+        <th style="width:36px">#</th>
+        <th>Player</th>
+        <th onclick="setSort('edge_score')">Edge Score</th>
+        <th>Tier</th>
+        <th onclick="setSort('salary')">Salary</th>
+        <th>Signals</th>
+        <th>Kelly</th>
+        <th onclick="setSort('projected_ownership')">Own%</th>
+        <th onclick="setSort('implied_consensus')">Win%</th>
+        <th style="width:30px"></th>
+      </tr>
+    </thead>
+    <tbody id="player-tbody"></tbody>
+  </table>
+  <div class="empty" id="empty-state" style="display:none">
+    <h3>No players match</h3>
+    <p>Try adjusting filters or refreshing data.</p>
+  </div>
+</div>
+
+<!-- ── Detail panel ── -->
+<div id="detail-panel">
+  <div class="panel-header">
+    <button class="panel-close" onclick="closeDetail()">✕</button>
+    <div id="dp-name" style="font-size:18px; font-weight:800; letter-spacing:-0.3px; margin-bottom:4px"></div>
+    <div id="dp-meta" style="font-size:12px; color:var(--dim)"></div>
+  </div>
+  <div class="panel-body" id="dp-body"></div>
+</div>
+
+<!-- ── Lineup modal ── -->
+<div id="lineup-modal">
+  <div class="modal-box">
+    <div class="modal-header">
+      <div class="modal-title">Build DK Lineups</div>
+      <button class="modal-close" onclick="closeLineupModal()">✕</button>
+    </div>
+    <div class="lineup-controls">
+      <span class="ctrl-label">Lineups:</span>
+      <input class="ctrl-input" type="number" id="lineup-count" value="20" min="1" max="150">
+      <button class="gen-btn" onclick="generateLineups()">Generate</button>
+      <button class="dl-btn" id="dl-csv-btn" style="display:none" onclick="downloadLineupCSV()">↓ DK Upload CSV</button>
+    </div>
+    <div class="modal-body" id="modal-body">
+      <div class="loader" id="lineup-loader" style="display:none">
+        <div class="spinner"></div> Optimizing...
+      </div>
+      <div id="lineup-results"></div>
+    </div>
+  </div>
+</div>
+
+<script>
+// ── State ──────────────────────────────────────────────────────────────────
+let allPlayers  = [];
+let filtered    = [];
+let watchlist   = new Set(JSON.parse(localStorage.getItem('dk_watch') || '[]'));
+let tierFilter  = 'ALL';
+let sortKey     = 'edge_score';
+let sortAsc     = false;
+let lineupData  = [];
+let selectedRow = null;
+
+// ── Colors ─────────────────────────────────────────────────────────────────
+function scoreColor(s) {
+  if (s >= 80) return '#00d595';
+  if (s >= 65) return '#22d3ee';
+  if (s >= 50) return '#f5a623';
+  if (s >= 35) return '#fb923c';
+  return '#f6465d';
+}
+
+function tierClass(t) {
+  const m = { ELITE:'tb-elite', STRONG:'tb-strong', LEAN:'tb-lean', WEAK:'tb-weak', FADE:'tb-fade' };
+  return m[t] || 'tb-fade';
+}
+
+function kellyClass(k) {
+  if (!k || k === 'Pass') return 'kb-pass';
+  if (k.startsWith('0.5')) return 'kb-weak';
+  if (k.startsWith('1'))   return 'kb-lean';
+  if (k.startsWith('2'))   return 'kb-strong';
+  return 'kb-elite';
+}
+
+function sigColor(sig) {
+  if      (sig === 'sig_divergence')  return '#a78bfa';
+  else if (sig === 'sig_value')       return '#22d3ee';
+  else if (sig === 'sig_course_fit')  return '#00d595';
+  else if (sig === 'sig_ownership')   return '#f5a623';
+  return '#6b7280';
+}
+
+// ── Fetch ──────────────────────────────────────────────────────────────────
+async function fetchPlayers(force = false) {
+  const btn = document.getElementById('refresh-btn');
+  btn.classList.add('spinning');
+
+  try {
+    const r = await fetch('/api/players' + (force ? '?refresh=1' : ''));
+    const d = await r.json();
+
+    allPlayers = d.players || [];
+
+    // Update header
+    const meta = d.meta || {};
+    document.getElementById('tournament-name').textContent = meta.tournament || 'PGA Tour';
+    document.getElementById('wind-display').textContent    = `Wind: ${meta.wind_mph || 0} mph`;
+
+    // Stat cards
+    document.getElementById('s-total').textContent = d.total || 0;
+    document.getElementById('s-top').textContent   = d.top_score || 0;
+    document.getElementById('s-avg').textContent   = d.avg_score || 0;
+    document.getElementById('s-watched').textContent = watchlist.size;
+
+    // Tier counts
+    const tiers = d.tiers || {};
+    document.getElementById('tc-elite').textContent  = tiers.ELITE  || 0;
+    document.getElementById('tc-strong').textContent = tiers.STRONG || 0;
+    document.getElementById('tc-lean').textContent   = tiers.LEAN   || 0;
+    document.getElementById('tc-weak').textContent   = tiers.WEAK   || 0;
+    document.getElementById('tc-fade').textContent   = tiers.FADE   || 0;
+    document.getElementById('s-elite').textContent   = tiers.ELITE  || 0;
+    document.getElementById('s-course').textContent  = (meta.course_profile || 'balanced').toUpperCase();
+
+    // Cache age
+    if (d.cache_age !== null && d.cache_age !== undefined) {
+      const m = Math.floor(d.cache_age / 60);
+      const s = d.cache_age % 60;
+      document.getElementById('cache-age').textContent = m > 0 ? `${m}m ${s}s ago` : `${s}s ago`;
+    }
+
+    document.getElementById('loader').style.display = 'none';
+    document.getElementById('player-table').style.display = '';
+
+    applyFilters();
+
+  } catch(e) {
+    console.error('Fetch error:', e);
+    document.getElementById('loader').innerHTML = '<div style="color:var(--red)">⚠ Failed to load data. Is the server running?</div>';
+  } finally {
+    btn.classList.remove('spinning');
+  }
+}
+
+// ── Filters & sort ─────────────────────────────────────────────────────────
+function setTierFilter(tier, el) {
+  tierFilter = tier;
+  document.querySelectorAll('.tier-pill').forEach(p => p.classList.remove('active'));
+  if (el) el.classList.add('active');
+  applyFilters();
+}
+
+function filterTier(tier) {
+  tierFilter = tier;
+  document.querySelectorAll('.tier-pill').forEach(p => {
+    p.classList.toggle('active', p.dataset.tier === tier);
+  });
+  applyFilters();
+}
+
+function setSort(key, el) {
+  if (sortKey === key) {
+    sortAsc = !sortAsc;
+  } else {
+    sortKey = key;
+    sortAsc = false;
+  }
+  if (el) {
+    document.querySelectorAll('.sort-btn').forEach(b => b.classList.remove('active'));
+    el.classList.add('active');
+  }
+  applyFilters();
+}
+
+function applyFilters() {
+  const q = document.getElementById('search-input').value.toLowerCase().trim();
+
+  filtered = allPlayers.filter(p => {
+    if (tierFilter !== 'ALL' && p.tier !== tierFilter) return false;
+    if (q && !p.name.toLowerCase().includes(q)) return false;
+    return true;
+  });
+
+  filtered.sort((a, b) => {
+    let va = a[sortKey] ?? 0;
+    let vb = b[sortKey] ?? 0;
+    return sortAsc ? va - vb : vb - va;
+  });
+
+  renderTable();
+}
+
+// ── Table render ──────────────────────────────────────────────────────────
+function renderTable() {
+  const tbody = document.getElementById('player-tbody');
+  const empty = document.getElementById('empty-state');
+
+  if (!filtered.length) {
+    tbody.innerHTML = '';
+    document.getElementById('player-table').style.display = 'none';
+    empty.style.display = '';
+    return;
+  }
+
+  document.getElementById('player-table').style.display = '';
+  empty.style.display = 'none';
+
+  tbody.innerHTML = filtered.map((p, i) => {
+    const c   = scoreColor(p.edge_score);
+    const tc  = tierClass(p.tier);
+    const kc  = kellyClass(p.kelly);
+    const starred = watchlist.has(p.name);
+    const own = p.projected_ownership != null ? p.projected_ownership.toFixed(1) + '%' : '—';
+    const win = p.implied_consensus   != null ? p.implied_consensus.toFixed(1)   + '%' : '—';
+    const sal = p.salary ? '$' + p.salary.toLocaleString() : '—';
+
+    const sigs = ['sig_divergence','sig_value','sig_course_fit','sig_ownership'].map(s => {
+      const v = p[s] || 0;
+      return `<div class="sig-pip"><div class="sig-pip-fill" style="width:${v}%;background:${sigColor(s)}"></div></div>`;
+    }).join('');
+
+    return `
+      <tr onclick="openDetail('${p.name}')" data-name="${p.name}">
+        <td><span class="rank-num">${i + 1}</span></td>
+        <td><span class="player-name">${p.name}</span></td>
+        <td>
+          <div class="score-badge">
+            <span style="color:${c}">${p.edge_score}</span>
+            <div class="score-bar-wrap">
+              <div class="score-bar-fill" style="width:${p.edge_score}%;background:${c}"></div>
+            </div>
+          </div>
+        </td>
+        <td><span class="tier-badge ${tc}">${p.tier}</span></td>
+        <td><span class="salary-cell">${sal}</span></td>
+        <td><div class="signal-mini">${sigs}</div></td>
+        <td><span class="kelly-badge ${kc}">${p.kelly || 'Pass'}</span></td>
+        <td><span class="own-pct">${own}</span></td>
+        <td><span class="own-pct" style="color:var(--green)">${win}</span></td>
+        <td>
+          <button class="star-btn ${starred ? 'starred' : ''}"
+            onclick="toggleWatch(event, '${p.name}')" title="Add to watchlist">
+            ${starred ? '★' : '☆'}
+          </button>
+        </td>
+      </tr>
+    `;
+  }).join('');
+}
+
+// ── Watchlist ──────────────────────────────────────────────────────────────
+function toggleWatch(e, name) {
+  e.stopPropagation();
+  if (watchlist.has(name)) {
+    watchlist.delete(name);
+  } else {
+    watchlist.add(name);
+  }
+  localStorage.setItem('dk_watch', JSON.stringify([...watchlist]));
+  document.getElementById('s-watched').textContent = watchlist.size;
+  renderTable();
+}
+
+// ── Detail panel ──────────────────────────────────────────────────────────
+function openDetail(name) {
+  const p = allPlayers.find(x => x.name === name);
+  if (!p) return;
+
+  // Highlight row
+  document.querySelectorAll('tbody tr').forEach(r => r.classList.remove('selected'));
+  const row = document.querySelector(`tr[data-name="${name}"]`);
+  if (row) row.classList.add('selected');
+
+  document.getElementById('dp-name').textContent = p.name;
+  document.getElementById('dp-meta').textContent =
+    `${p.tier} · ${p.kelly || 'Pass'} kelly · $${(p.salary||0).toLocaleString()} salary`;
+
+  const c = scoreColor(p.edge_score);
+  const signals = [
+    { key: 'sig_divergence',  label: 'Odds Divergence',   weight: '35%', color: '#a78bfa' },
+    { key: 'sig_value',       label: 'Salary Value',      weight: '30%', color: '#22d3ee' },
+    { key: 'sig_course_fit',  label: 'Course Fit',        weight: '25%', color: '#00d595' },
+    { key: 'sig_ownership',   label: 'Ownership Leverage',weight: '10%', color: '#f5a623' },
+  ];
+
+  const signalRows = signals.map(s => `
+    <div class="signal-row">
+      <div class="signal-label">
+        <span>${s.label} <span style="color:var(--muted);font-weight:500">(${s.weight})</span></span>
+        <span>${(p[s.key] || 0).toFixed(1)}</span>
+      </div>
+      <div class="signal-track">
+        <div class="signal-fill" style="width:${p[s.key] || 0}%;background:${s.color}"></div>
+      </div>
+    </div>
+  `).join('');
+
+  const odds = [
+    ['DK Sportsbook',  p.implied_dk],
+    ['FanDuel',        p.implied_fanduel],
+    ['Kalshi',         p.implied_kalshi],
+    ['Polymarket',     p.implied_polymarket],
+    ['Vegas',          p.implied_vegas],
+    ['BetMGM',         p.implied_betmgm],
+  ].filter(([_, v]) => v != null && v > 0);
+
+  const oddsRows = odds.map(([label, val]) => `
+    <div style="display:flex;justify-content:space-between;padding:6px 0;border-bottom:1px solid var(--border);font-size:12px">
+      <span style="color:var(--dim)">${label}</span>
+      <span style="font-weight:700;color:var(--green)">${val.toFixed(2)}%</span>
+    </div>
+  `).join('');
+
+  const sg = [
+    ['SG: Off-the-Tee', p.sg_ott],
+    ['SG: Approach',    p.sg_app],
+    ['SG: Around Green',p.sg_atg],
+    ['SG: Putting',     p.sg_putt],
+  ].filter(([_, v]) => v != null);
+
+  const sgRows = sg.map(([label, val]) => {
+    const vv = parseFloat(val) || 0;
+    const color = vv >= 1.0 ? '#00d595' : vv >= 0 ? '#f5a623' : '#f6465d';
+    return `
+      <div style="display:flex;justify-content:space-between;padding:6px 0;border-bottom:1px solid var(--border);font-size:12px">
+        <span style="color:var(--dim)">${label}</span>
+        <span style="font-weight:700;color:${color}">${vv >= 0 ? '+' : ''}${vv.toFixed(2)}</span>
+      </div>
+    `;
+  }).join('');
+
+  document.getElementById('dp-body').innerHTML = `
+    <div style="margin-bottom:20px;padding:16px;background:var(--card);border:1px solid var(--border);border-radius:10px;text-align:center">
+      <div style="font-size:11px;font-weight:700;letter-spacing:1px;text-transform:uppercase;color:var(--dim);margin-bottom:6px">Edge Score</div>
+      <div style="font-size:48px;font-weight:900;color:${c};line-height:1;letter-spacing:-2px">${p.edge_score}</div>
+      <div style="font-size:13px;color:var(--dim);margin-top:4px">/ 100</div>
+    </div>
+
+    <div class="detail-stat-grid">
+      <div class="detail-stat">
+        <div class="detail-stat-label">Salary</div>
+        <div class="detail-stat-val">$${(p.salary||0).toLocaleString()}</div>
+      </div>
+      <div class="detail-stat">
+        <div class="detail-stat-label">Projection</div>
+        <div class="detail-stat-val">${(p.projection||0).toFixed(1)} pts</div>
+      </div>
+      <div class="detail-stat">
+        <div class="detail-stat-label">Win Probability</div>
+        <div class="detail-stat-val" style="color:var(--green)">${(p.implied_consensus||0).toFixed(2)}%</div>
+      </div>
+      <div class="detail-stat">
+        <div class="detail-stat-label">Proj. Ownership</div>
+        <div class="detail-stat-val">${(p.projected_ownership||0).toFixed(1)}%</div>
+      </div>
+    </div>
+
+    <div style="margin-bottom:20px">
+      <div class="section-title">Signal Breakdown</div>
+      ${signalRows}
+    </div>
+
+    ${odds.length ? `
+    <div style="margin-bottom:20px">
+      <div class="section-title">Market Implied Win %</div>
+      ${oddsRows}
+    </div>` : ''}
+
+    ${sg.length ? `
+    <div style="margin-bottom:20px">
+      <div class="section-title">Strokes Gained (L24)</div>
+      ${sgRows}
+    </div>` : ''}
+  `;
+
+  document.getElementById('detail-panel').classList.add('open');
+}
+
+function closeDetail() {
+  document.getElementById('detail-panel').classList.remove('open');
+  document.querySelectorAll('tbody tr').forEach(r => r.classList.remove('selected'));
+}
+
+// ── Lineup modal ───────────────────────────────────────────────────────────
+function openLineupModal() {
+  document.getElementById('lineup-modal').classList.add('open');
+}
+
+function closeLineupModal() {
+  document.getElementById('lineup-modal').classList.remove('open');
+}
+
+async function generateLineups() {
+  const count = parseInt(document.getElementById('lineup-count').value) || 20;
+  document.getElementById('lineup-loader').style.display = 'flex';
+  document.getElementById('lineup-results').innerHTML = '';
+  document.getElementById('dl-csv-btn').style.display = 'none';
+
+  try {
+    const r = await fetch('/api/lineups', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ count }),
+    });
+    const d = await r.json();
+
+    lineupData = d.lineups || [];
+    renderLineups(lineupData);
+    if (lineupData.length) {
+      document.getElementById('dl-csv-btn').style.display = '';
+    }
+  } catch(e) {
+    document.getElementById('lineup-results').innerHTML =
+      '<div style="color:var(--red);padding:20px">Failed to generate lineups.</div>';
+  } finally {
+    document.getElementById('lineup-loader').style.display = 'none';
+  }
+}
+
+function renderLineups(lineups) {
+  if (!lineups.length) {
+    document.getElementById('lineup-results').innerHTML =
+      '<div class="empty"><h3>No valid lineups found</h3><p>Try adding more player data or relaxing exposure limits.</p></div>';
+    return;
+  }
+
+  document.getElementById('lineup-results').innerHTML = lineups.map((lu, i) => {
+    const chips = lu.players.map(p => `
+      <div class="lineup-player-chip">
+        ${p.name}<small>$${(p.salary||0).toLocaleString()}</small>
+      </div>
+    `).join('');
+
+    return `
+      <div class="lineup-card">
+        <div class="lineup-card-header">
+          <span class="lineup-num">LINEUP ${i + 1}</span>
+          <div class="lineup-meta">
+            <span>Salary: <b>$${lu.salary.toLocaleString()}</b></span>
+            <span>Rem: <b style="color:var(--green)">$${lu.salary_rem.toLocaleString()}</b></span>
+            <span>Avg Edge: <b style="color:${scoreColor(lu.avg_edge)}">${lu.avg_edge}</b></span>
+            <span>Proj: <b>${lu.total_proj}</b></span>
+          </div>
+        </div>
+        <div class="lineup-players">${chips}</div>
+      </div>
+    `;
+  }).join('');
+}
+
+function downloadLineupCSV() {
+  if (!lineupData.length) return;
+
+  const header = ['Entry ID','Contest Name','Contest ID','Entry Fee','G','G','G','G','G','G'];
+  const rows = lineupData.map(lu => {
+    const names = lu.players.map(p => p.name);
+    while (names.length < 6) names.push('');
+    return ['', 'PGA TOUR', '', '', ...names.slice(0, 6)];
+  });
+
+  const csv = [header, ...rows].map(r => r.join(',')).join('\n');
+  const blob = new Blob([csv], { type: 'text/csv' });
+  const url  = URL.createObjectURL(blob);
+  const a    = document.createElement('a');
+  a.href     = url;
+  a.download = 'dk_lineups.csv';
+  a.click();
+  URL.revokeObjectURL(url);
+}
+
+function exportCSV() {
+  window.location = '/api/export/csv';
+}
+
+// ── Close panel on outside click ───────────────────────────────────────────
+document.addEventListener('keydown', e => {
+  if (e.key === 'Escape') {
+    closeDetail();
+    closeLineupModal();
+  }
+});
+
+// ── Auto refresh every 10 min ──────────────────────────────────────────────
+setInterval(() => fetchPlayers(false), 600000);
+
+// ── Init ───────────────────────────────────────────────────────────────────
+fetchPlayers();
+</script>
+</body>
+</html>
